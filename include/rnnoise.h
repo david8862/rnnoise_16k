@@ -23,6 +23,13 @@
    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#ifndef _RNNOISE_H_
+#define _RNNOISE_H_
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
+
 
 #ifndef RNNOISE_EXPORT
 # if defined(WIN32)
@@ -41,12 +48,19 @@
 
 typedef struct DenoiseState DenoiseState;
 
-RNNOISE_EXPORT int rnnoise_get_size();
+//RNNOISE_EXPORT int rnnoise_get_size();
 
-RNNOISE_EXPORT int rnnoise_init(DenoiseState *st);
+//RNNOISE_EXPORT int rnnoise_init(DenoiseState *st);
 
 RNNOISE_EXPORT DenoiseState *rnnoise_create();
 
 RNNOISE_EXPORT void rnnoise_destroy(DenoiseState *st);
 
 RNNOISE_EXPORT float rnnoise_process_frame(DenoiseState *st, float *out, const float *in);
+
+
+#ifdef  __cplusplus
+}
+#endif
+
+#endif  /* _RNNOISE_H_ */
