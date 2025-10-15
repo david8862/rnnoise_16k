@@ -2,12 +2,12 @@
 
 from __future__ import print_function
 
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
-from keras.layers import GRU
-from keras.models import load_model
-from keras import backend as K
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras.layers import GRU
+from tensorflow.keras.models import load_model
+from tensorflow.keras import backend as K
 import sys
 import re
 import numpy as np
@@ -83,7 +83,8 @@ class WeightClip:
         return K.clip(p, -self.c, self.c)
 
     def get_config(self):
-        return {'name': self.__class__.__name__, 'c': self.c}
+        #return {'name': self.__class__.__name__, 'c': self.c}
+        return {'c': self.c}
 
 
 

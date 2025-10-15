@@ -42,7 +42,6 @@
 #include <dirent.h>
 #include <time.h>
 #if TRAINING
-#include <getopt.h>
 #define DR_MP3_IMPLEMENTATION
 #define DR_WAV_IMPLEMENTATION
 #include "dr_mp3.h"
@@ -549,7 +548,7 @@ float calculate_wav_energy(float *wav_buffer, uint64_t sampleCount){
     float E_speech = 0.0;
     if (sampleCount > BLOCK_SIZE) {
         while (flag < blocks) {
-            //printf("blocks ==== %d, samplecount = %d, flag == %d\n", blocks, sampleCount, flag);
+            printf("blocks ==== %d, samplecount = %d, flag == %d\n", blocks, sampleCount, flag);
             for (int j = 0; j < BLOCK_SIZE; j++) {
                 E_speech += input[j] * input[j];
 
@@ -658,7 +657,7 @@ void get_file_list3(DIR *dir, char* path, char **file_list, int *count){
 
 float *wavRead_f32(const char *filename, uint32_t *sampleRate, uint64_t *sampleCount, uint32_t *channels) {
     drwav_uint64 totalSampleCount = 0;
-    //fprintf(stderr, "read file name ==== %s\n", filename);
+    fprintf(stderr, "read file name ==== %s\n", filename);
 
     float *input = drwav_open_file_and_read_pcm_frames_f32(filename, channels, sampleRate, &totalSampleCount);
     //fprintf(stderr, "input ==== %d\n", input);
@@ -694,7 +693,7 @@ float  *open_file(char **dir_list, int file_list_len, uint32_t *sampleRate, uint
 //    }else{
 //        //printf(" This should be noise file , %d th file === File_name ===  %s \n",i, dir_list[i]);
 //    }
-    //fprintf(stderr, "open file name =================== %s\n", dir_list[i]);
+    fprintf(stderr, "open file name =================== %s\n", dir_list[i]);
 
     //char *filename = "/media/yongyug/DATA/new_train/noise_dir/noise-free-sound-0711.wav";
     float *buffer = wavRead_f32(dir_list[i], sampleRate, sampleCount, channels);
@@ -723,27 +722,8 @@ static void rand_resp(float *a, float *b) {
 }
 
 
-void show_progressbar(int progress, int total, int barWidth)
-{
-    float percentage = (float)progress / total;
-    int filledLength = barWidth * percentage;
 
-    printf("\r[");
-    for (int i = 0; i < barWidth; i++) {
-        if (i < filledLength) {
-            printf("#");
-        } else {
-            printf(" ");
-        }
-    }
-    printf("] %.1f%%", percentage * 100);
-
-    fflush(stdout);
-}
-
-
-int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num, char* output_audio_file, char* output_feature_file, int verbose)
-{
+int main(int argc, char **argv) {
     int i;
     int count=0;
     static const float a_hp[2] = {-1.99599, 0.99600};
@@ -765,20 +745,17 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
     int gain_change_count=0;
     //float speech_gain = 1, noise_gain = 1;
     int speech_flag = 1, noise_flag = 1;
-    //char *out_file = argv[4];
-
-    //char* feature_file = argv[5];
-
+    char *out_file = argv[3];
     DenoiseState *st;
     DenoiseState *noise_state;
     DenoiseState *noisy;
     st = rnnoise_create();
     noise_state = rnnoise_create();
     noisy = rnnoise_create();
-    //if (argc!=6) {
-    //    fprintf(stderr, "usage: %s <speech> <noise> <loop num> <output mixed> <output feature>\n", argv[0]);
-    //    return 1;
-    //}
+    if (argc!=4) {
+        fprintf(stderr, "usage: %s <speech> <noise>  <output mixed>\n", argv[0]);
+        return 1;
+    }
 
     char **speech_array = (char**)malloc(sizeof(char*) * MAX_FILE);
     char **noise_array = (char**)malloc(sizeof(char*) * MAX_FILE);
@@ -796,17 +773,16 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
     float speech_energy = 0;
     float noise_energy = 0;
     float expcected_SNR = 0.0;
-    //if((dirSpeech = opendir(argv[1])) == NULL || (dirNoise = opendir(argv[2])) == NULL)
-    if((dirSpeech = opendir(speech_path)) == NULL || (dirNoise = opendir(noise_path)) == NULL)
+    if((dirSpeech = opendir(argv[1])) == NULL || (dirNoise = opendir(argv[2])) == NULL)
     {
         //printf("open dir failed !");
         return -1;
     }
     else{
-        get_file_list3(dirSpeech, speech_path, speech_array, &speechcount);
+        get_file_list3(dirSpeech, argv[1], speech_array, &speechcount);
         //printf("check if get count %d \n",speechcount);
 
-        get_file_list3(dirNoise, noise_path, noise_array, &noisecount);
+        get_file_list3(dirNoise, argv[2], noise_array, &noisecount);
         //printf("check if get count %d \n",noisecount);
     }
     closedir(dirSpeech);
@@ -836,11 +812,7 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
     format.channels = 1;
     format.sampleRate = (drwav_uint32) SAMPLE_RATE;
     format.bitsPerSample = 16;
-    drwav *pWav = drwav_open_file_write(output_audio_file, &format);
-
-    FILE* fp_feature = fopen(output_feature_file, "wb");
-
-    //int loop_num = strtol(argv[3], NULL, 10);
+    drwav *pWav = drwav_open_file_write(out_file, &format);
     while (1)
     {
         //int frames_count = 0;
@@ -856,9 +828,8 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
         float vad=0;
         float vad_prob;
         float E=0;
-        //if (count==1000000) break;
-        if (count >= loop_num) break;
-        //fprintf(stderr, "count ==== %d\n", count);
+        if (count==1000000) break;
+        fprintf(stderr, "count ==== %d\n", count);
 
 
         //if (count==50000000) break;
@@ -1007,16 +978,6 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
         noise_input+=FRAME_SIZE;
         count++;
 
-        if (verbose) {
-            // show audio feature values
-            for (int l = 0; l < NB_FEATURES; l++) {
-                fprintf(stderr, "matrix features ===== : %f \n ", features[l]);
-            }
-        } else {
-            // show process bar
-            int percentage = 100*count/loop_num;
-            show_progressbar(percentage, 100, 100);
-        }
 
         #if 0
             for (i=0;i<NB_FEATURES;i++) printf("%f ", features[i]);
@@ -1025,16 +986,16 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
         printf("%f\n", vad);
         #endif
         #if 1
-        //for (int l = 0; l < NB_FEATURES; l++) {
-        //    fprintf(stderr, "matrix features ===== : %f \n ", features[l]);
-        //}
+        for (int l = 0; l < NB_FEATURES; l++) {
+            fprintf(stderr, "matrix features ===== : %f \n ", features[l]);
+        }
 
 
 
-        fwrite(features, sizeof(float), NB_FEATURES, fp_feature);
-            fwrite(g, sizeof(float), NB_BANDS, fp_feature);
-            fwrite(Ln, sizeof(float), NB_BANDS, fp_feature);
-            fwrite(&vad, sizeof(float), 1, fp_feature);
+        fwrite(features, sizeof(float), NB_FEATURES, stdout);
+            fwrite(g, sizeof(float), NB_BANDS, stdout);
+            fwrite(Ln, sizeof(float), NB_BANDS, stdout);
+            fwrite(&vad, sizeof(float), 1, stdout);
         #endif
         #if 0
                 compute_rnn(&noisy->rnn, g, &vad_prob, features);
@@ -1053,88 +1014,8 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
 
     }
     drwav_uninit(pWav);
-    fprintf(stderr, "\nDone. feature matrix shape: %d x %d\n", count, NB_FEATURES + 2*NB_BANDS + 1);
+    fprintf(stderr, "matrix size: %d x %d\n", count, NB_FEATURES + 2*NB_BANDS + 1);
 
-    fclose(fp_feature);
-    return 0;
-}
-
-void display_usage()
-{
-    printf("Usage: denoise_train_data_creator\n" \
-           "--speech_path, -s: path for speech wav audio file. default: ./speech/\n" \
-           "--noise_path, -n: path for noise wav audio file. default: ./noise/\n" \
-           "--loop_num, -l: generate loop number. default: 10000\n" \
-           "--output_audio_file, -a: output mixed wav audio file. default: mixed.wav\n" \
-           "--output_feature_file, -f: output audio feature matrix file. default: train_data_16k_f32.bin\n" \
-           "--verbose, -v: whether to display audio feature details (0|1). default: 0\n" \
-           "\n");
-    return;
-}
-
-#define MAX_STR_LEN 128
-
-int main(int argc, char** argv)
-{
-    char speech_path[MAX_STR_LEN] = "./speech/";
-    char noise_path[MAX_STR_LEN] = "./noise/";
-    int loop_num = 10000;
-    char output_audio_file[MAX_STR_LEN] = "mixed.wav";
-    char output_feature_file[MAX_STR_LEN] = "training_data_16k.f32";
-    int verbose = 0;
-
-    int c;
-    while (1) {
-        static struct option long_options[] = {
-            {"speech_path", required_argument, NULL, 's'},
-            {"noise_path", required_argument, NULL, 'n'},
-            {"loop_num", required_argument, NULL, 'l'},
-            {"output_audio_file", required_argument, NULL, 'a'},
-            {"output_feature_file", required_argument, NULL, 'f'},
-            {"verbose", required_argument, NULL, 'v'},
-            {"help", no_argument, NULL, 'h'},
-            {NULL, 0, NULL, 0}};
-
-        /* getopt_long stores the option index here. */
-        int option_index = 0;
-        c = getopt_long(argc, argv, "a:f:hl:n:s:v:", long_options, &option_index);
-
-        /* Detect the end of the options. */
-        if (c == -1) break;
-
-        switch (c) {
-            case 'a':
-                memset(output_audio_file, 0, MAX_STR_LEN);
-                strcpy(output_audio_file, optarg);
-                break;
-            case 'f':
-                memset(output_feature_file, 0, MAX_STR_LEN);
-                strcpy(output_feature_file, optarg);
-                break;
-            case 'l':
-                loop_num = strtol(optarg, NULL, 10);
-                break;
-            case 'n':
-                memset(noise_path, 0, MAX_STR_LEN);
-                strcpy(noise_path, optarg);
-                break;
-            case 's':
-                memset(speech_path, 0, MAX_STR_LEN);
-                strcpy(speech_path, optarg);
-                break;
-            case 'v':
-                verbose = strtol(optarg, NULL, 10);
-                break;
-            case 'h':
-            case '?':
-            default:
-                /* getopt_long already printed an error message. */
-                display_usage();
-                exit(-1);
-        }
-    }
-
-    denoise_train_data_creator(speech_path, noise_path, loop_num, output_audio_file, output_feature_file, verbose);
 
     return 0;
 }

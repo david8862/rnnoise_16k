@@ -1,6 +1,6 @@
 # project
 cmake_minimum_required(VERSION 3.5)
-project(rnnoise_16k LANGUAGES C)
+project(rnnoise_16k LANGUAGES C CXX)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_BUILD_TYPE "Debug")
 #set(CMAKE_BUILD_TYPE "Release")
@@ -63,8 +63,10 @@ else()
 endif()
 target_include_directories(${LIBRNNOISE} PUBLIC ${CMAKE_HOME_DIRECTORY}/include/)
 
-# --- [ Build samples
-file (GLOB SAMPLE_SRCS   ${CMAKE_HOME_DIRECTORY}/samples/*.c)
+# --- [ Build samples, including .c & .cpp
+file (GLOB C_SAMPLE_SRCS   ${CMAKE_HOME_DIRECTORY}/samples/*.c)
+file (GLOB CPP_SAMPLE_SRCS   ${CMAKE_HOME_DIRECTORY}/samples/*.cpp)
+set(SAMPLE_SRCS ${C_SAMPLE_SRCS} ${CPP_SAMPLE_SRCS})
 foreach (source ${SAMPLE_SRCS})
   get_filename_component(name ${source} NAME_WE)
   add_executable(${name} ${source})
@@ -80,7 +82,7 @@ if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 # get header files
-file(GLOB LIBRNNOISE_HDRS   ${CMAKE_HOME_DIRECTORY}/include/*.h)
+file(GLOB LIBRNNOISE_HDRS   ${CMAKE_HOME_DIRECTORY}/include/rnnoise.h)
 
 set_target_properties(${LIBRNNOISE} PROPERTIES
         VERSION   ${RNNOISE_TARGET_VERSION}
@@ -89,6 +91,6 @@ install(TARGETS ${LIBRNNOISE} EXPORT RNNoiseTargets DESTINATION ${CMAKE_INSTALL_
 
 install(FILES ${LIBRNNOISE_HDRS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-set(RNNOISE_SAMPLES rnnoise_sample rnnvad_sample)
+set(RNNOISE_SAMPLES rnnoise_sample rnnvad_sample rnnvad_postprocess_sample)
 install(TARGETS ${RNNOISE_SAMPLES} DESTINATION ${CMAKE_INSTALL_BINDIR}/samples)
 

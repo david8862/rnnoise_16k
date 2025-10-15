@@ -16,6 +16,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <math.h>
+
 #include <rnnoise.h>
 
 #define MAX_STR_LEN 128
@@ -181,7 +182,7 @@ int main(int argc, char** argv)
         }
     }
 
-    printf("NOTE: RNNoise lib only support 16k sample rate, 16-bit audio data!\n");
+    printf("NOTE: RNNoise lib only support single channel, 16k sample rate, 16-bit audio data!\n");
     rnnoise_sample(input_file, chunk_size, output_file);
 
     printf("\nProcess finished.\n");

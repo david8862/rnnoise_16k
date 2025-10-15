@@ -14,6 +14,8 @@
 //
 // $ ./rnnoise_weight_dump -o rnn_data.c
 //
+// Replace "src/rnn_data.c" with the generated "rnn_data.c", and rebuild the
+// RNNoise lib & samples, then you can use the dumped model weights to inference
 // -----------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,28 +1,170 @@
 // Reference from:
 // https://github.com/YongyuG/rnnoise_16k/blob/master/main.c
+// https://blog.csdn.net/ericbar/article/details/79567108
 //
 // build & run with following cmd:
-// $ gcc -Wall -O2 -o rnnvad_sample rnnvad_sample.c -I<header file path> -L<lib file path> -lrnnoise -lm
-// $ ./rnnvad_sample -h
-// Usage: rnnvad_sample
+// $ g++ -Wall -O2 -o rnnvad_postprocess_sample rnnvad_postprocess_sample.cpp -I<header file path> -L<lib file path> -lrnnoise -lm
+// $ ./rnnvad_postprocess_sample -h
+// Usage: rnnvad_postprocess_sample
 // --input_file, -i: input raw audio file. default: 'input.wav'
 // --chunk_size,  -c: audio chunk size to read every time. default: 640
-// --vad_threshold, -t: threshold for vad probability. default: 0.5
 // --output_file, -o: output txt file for voice segment start & stop time (in seconds). default: output.txt
 //
-// $ ./rnnvad_sample -i vad_input.wav -o vad_output.txt
+// $ ./rnnvad_postprocess_sample -i vad_input.wav -o vad_output.txt
 //
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <getopt.h>
 #include <math.h>
+#include <assert.h>
+#include <vector>
 
 #include <rnnoise.h>
 
 #define MAX_STR_LEN 128
-#define RNNOISE_FRAME_SIZE (160)  // RNNoise use hard-coded frame size
+#define RNNOISE_FRAME_SIZE (160)  // RNNoise use hard-coded frame size (160 samples, 10ms)
 #define RNNOISE_SAMPLE_RATE (16000)  // RNNoise use hard-coded sample rate
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// VAD postprocess part
+
+// VAD result structure
+typedef struct vad_result
+{
+    bool speech_trigger = false;
+    float real_bos = -1.0;
+    float real_eos = -1.0;
+} rnnvad_results;
+
+// VAD postprocess param structure
+typedef struct vad_param
+{
+    int min_speech_len = 12;                  // (10ms)*(12frames) = 120ms
+    int speech_activate_windows_size = 12;
+    int max_silence_len = 50;                 // (10ms)*(50frames) = 500ms
+    int max_silence_len_multilan = 55;        // (10ms)*(55frames) = 550ms
+    int min_speech_len_inside = 8;            //  (10ms)*(8frames) = 80ms
+    std::vector<int> vadprob_array;
+    bool speech_maybe_ending = false;
+    float prob_threshold = 0.4;
+    int accum_silence_len = 0;
+    int accum_speech_begin_len = 0;
+    int accum_speech_inside_len = 0;
+    long total_frames = 0;                    // frames every 10ms or 160 samples
+} rnnvad_params;
+
+
+bool clear_inner_accum_after_end(rnnvad_params& vad_param)
+{
+    vad_param.vadprob_array.clear();
+
+    vad_param.speech_maybe_ending = false;
+    vad_param.accum_silence_len = 0;
+    vad_param.accum_speech_begin_len = 0;
+    vad_param.accum_speech_inside_len = 0;
+
+    return true;
+}
+
+bool clear_inner_accum_when_find_begin(rnnvad_params& vad_param)
+{
+    vad_param.vadprob_array.clear();
+
+    vad_param.speech_maybe_ending = false;
+    vad_param.accum_silence_len = 0;
+    vad_param.accum_speech_inside_len = 0;
+
+    return true;
+}
+
+// smoothing per-frame VAD result
+void vad_smoothing(rnnvad_params& vad_param, rnnvad_results& vad_result, int language)
+{
+    vad_param.total_frames += 1;
+
+    if (vad_result.speech_trigger) {
+        // ----------------speech is active --------------------
+        assert(!vad_param.vadprob_array.empty());
+
+        if (vad_param.speech_maybe_ending) {
+            vad_param.accum_silence_len += 1;
+            if(vad_param.vadprob_array.back() == 1) {
+                vad_param.accum_speech_inside_len += 1;
+                if(vad_param.accum_speech_inside_len >= vad_param.min_speech_len_inside) {
+                    // trigger VAD action & recover all VAD begin related status
+                    clear_inner_accum_when_find_begin(vad_param);
+                    vad_result.speech_trigger = true;
+                }
+            }
+            else if(vad_param.vadprob_array.back() == 0) {
+                // ...
+                vad_param.accum_speech_inside_len = 0;
+            }
+            if(vad_param.accum_silence_len >= ((language > 0 ? vad_param.max_silence_len_multilan : vad_param.max_silence_len) + vad_param.accum_speech_inside_len)) {
+                // clear VAD action & recover all VAD end related status
+                vad_result.speech_trigger = false;
+                vad_result.real_eos = (vad_param.total_frames - vad_param.accum_silence_len) / 100.0;;
+                clear_inner_accum_after_end(vad_param);
+            }
+        } // end of if vad_param.speech_maybe_ending
+        else {
+            // no end firstly in speech maybe ending // then compare length
+            if(vad_param.vadprob_array.back() == 0) {
+                vad_param.speech_maybe_ending = true;
+                vad_param.accum_silence_len += 1;
+            } else if(vad_param.vadprob_array.back() == 1) {
+                vad_result.speech_trigger = true;
+            }
+            // vad_result.speech_trigger = true;
+        }
+    } // end of if speech trigger
+    else {
+        // ----------------speech is not active --------------------
+        vad_result.real_bos = -1.0;
+        if(static_cast<int> (vad_param.vadprob_array.size()) < vad_param.speech_activate_windows_size)
+            return;
+
+        // WINDOWS STRATEGY
+        // HARD CONTRAINTS WITH CONTINUATION
+        if(vad_param.vadprob_array.back() == 0) {
+            vad_param.accum_speech_begin_len = 0;
+            // return false;
+        } else if(vad_param.vadprob_array.back() == 1) {
+            vad_param.accum_speech_begin_len += 1;
+            if (vad_param.accum_speech_begin_len >= vad_param.min_speech_len) {
+                // trigger VAD active
+                vad_result.speech_trigger = true;
+                vad_param.accum_speech_begin_len = 0;
+                vad_result.real_bos = (vad_param.total_frames - vad_param.min_speech_len) / 100.0;
+            }
+            // ----------------------------------------------------------------
+        }
+    }
+
+    return;
+}
+
+// enqueue VAD probability into prob vector for smoothing
+int add_prob(float vad_prob, float prob_threshold, std::vector<int>& vadprob_array)
+{
+    vadprob_array.emplace_back((vad_prob > prob_threshold) ? 1 : 0);
+    return 0;
+}
+
+// VAD postprocess according to different language
+void vad_postprocess(float vad_prob, rnnvad_params& vad_param, rnnvad_results& vad_result, int language)
+{
+    add_prob(vad_prob, vad_param.prob_threshold, vad_param.vadprob_array);
+    vad_smoothing(vad_param, vad_result, language);
+
+    return;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 
 void show_progressbar(int progress, int total, int barWidth)
@@ -43,7 +185,8 @@ void show_progressbar(int progress, int total, int barWidth)
     fflush(stdout);
 }
 
-int rnnvad_sample(char* input_file, int chunk_size, float vad_threshold, char* output_file)
+
+int rnnvad_postprocess_sample(char* input_file, int chunk_size, char* output_file)
 {
     int ret;
     float vad_prob = 0.0;
@@ -95,6 +238,10 @@ int rnnvad_sample(char* input_file, int chunk_size, float vad_threshold, char* o
     short* short_buffer = (short*)calloc(chunk_size, sizeof(short));
     float* float_buffer = (float*)calloc(RNNOISE_FRAME_SIZE, sizeof(float));
 
+    // prepare VAD postprocess data structure
+    rnnvad_results vad_result;
+    rnnvad_params vad_param;
+
     // read out wav header (usually 44 bytes) to bypass it
     fread(short_buffer, 1, 44, fp_input);
 
@@ -115,8 +262,11 @@ int rnnvad_sample(char* input_file, int chunk_size, float vad_threshold, char* o
             // process frame to get VAD probability
             vad_prob = rnnoise_process_frame(st, float_buffer, float_buffer);
 
-            // check VAD probability with threshold to confirm status
-            vad_status = (vad_prob > vad_threshold) ? 1 : 0;
+            // VAD postprocess, language==0 means chinese
+            vad_postprocess(vad_prob, vad_param, vad_result, 0);
+            vad_status = (vad_result.speech_trigger) ? 1 : 0;
+
+            // check VAD status to record speech start/stop time
             if (vad_status != prev_vad_status) {
                 if ((prev_vad_status == 0) && (vad_status == 1)) {
                     // found VAD start point, record start time
@@ -156,10 +306,9 @@ int rnnvad_sample(char* input_file, int chunk_size, float vad_threshold, char* o
 
 void display_usage()
 {
-    printf("Usage: rnnvad_sample\n" \
+    printf("Usage: rnnvad_postprocess_sample\n" \
            "--input_file, -i: input raw audio file. default: 'input.wav'\n" \
            "--chunk_size, -c: audio chunk size to read every time. default: 640\n" \
-           "--vad_threshold, -t: threshold for vad probability. default: 0.5\n" \
            "--output_file, -o: output txt file for voice timestamps. default: output.txt\n" \
            "\n");
     return;
@@ -170,7 +319,6 @@ int main(int argc, char** argv)
 {
     char input_file[MAX_STR_LEN] = "input.wav";
     int chunk_size = 640;
-    float vad_threshold = 0.5;
     char output_file[MAX_STR_LEN] = "output.txt";
 
     int c;
@@ -178,14 +326,13 @@ int main(int argc, char** argv)
         static struct option long_options[] = {
             {"input_file", required_argument, NULL, 'i'},
             {"chunk_size", required_argument, NULL, 'c'},
-            {"vad_threshold", required_argument, NULL, 't'},
             {"output_file", required_argument, NULL, 'o'},
             {"help", no_argument, NULL, 'h'},
             {NULL, 0, NULL, 0}};
 
         /* getopt_long stores the option index here. */
         int option_index = 0;
-        c = getopt_long(argc, argv, "c:hi:o:t:", long_options, &option_index);
+        c = getopt_long(argc, argv, "c:hi:o:", long_options, &option_index);
 
         /* Detect the end of the options. */
         if (c == -1) break;
@@ -202,9 +349,6 @@ int main(int argc, char** argv)
                 memset(output_file, 0, MAX_STR_LEN);
                 strcpy(output_file, optarg);
                 break;
-            case 't':
-                vad_threshold = strtof(optarg, NULL);
-                break;
             case 'h':
             case '?':
             default:
@@ -215,7 +359,7 @@ int main(int argc, char** argv)
     }
 
     printf("NOTE: RNNoise lib only support single channel, 16k sample rate, 16-bit audio data!\n");
-    rnnvad_sample(input_file, chunk_size, vad_threshold, output_file);
+    rnnvad_postprocess_sample(input_file, chunk_size, output_file);
 
     printf("\nProcess finished.\n");
     return 0;
