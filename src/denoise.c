@@ -1053,7 +1053,8 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
 
     }
     drwav_uninit(pWav);
-    fprintf(stderr, "\nDone. feature matrix shape: %d x %d\n", count, NB_FEATURES + 2*NB_BANDS + 1);
+    fprintf(stderr, "\nDone. mixed audio has been saved to '%s', audio feature data has been saved to '%s'\n", output_audio_file, output_feature_file);
+    fprintf(stderr, "feature matrix shape: %d x %d\n", count, NB_FEATURES + 2*NB_BANDS + 1);
 
     fclose(fp_feature);
     return 0;
@@ -1080,7 +1081,7 @@ int main(int argc, char** argv)
     char noise_path[MAX_STR_LEN] = "./noise/";
     int loop_num = 10000;
     char output_audio_file[MAX_STR_LEN] = "mixed.wav";
-    char output_feature_file[MAX_STR_LEN] = "training_data_16k.f32";
+    char output_feature_file[MAX_STR_LEN] = "train_data_16k_f32.bin";
     int verbose = 0;
 
     int c;

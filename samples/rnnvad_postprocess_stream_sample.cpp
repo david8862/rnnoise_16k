@@ -3,14 +3,14 @@
 // https://blog.csdn.net/ericbar/article/details/79567108
 //
 // build & run with following cmd:
-// $ g++ -Wall -O2 -o rnnvad_postprocess_sample rnnvad_postprocess_sample.cpp -I<header file path> -L<lib file path> -lrnnoise -lm
-// $ ./rnnvad_postprocess_sample -h
-// Usage: rnnvad_postprocess_sample
+// $ g++ -Wall -O2 -o rnnvad_postprocess_stream_sample rnnvad_postprocess_stream_sample.cpp -I<header file path> -L<lib file path> -lrnnoise -lm
+// $ ./rnnvad_postprocess_stream_sample -h
+// Usage: rnnvad_postprocess_stream_sample
 // --input_file, -i: input raw audio file. default: 'input.wav'
 // --chunk_size,  -c: audio chunk size to read every time. default: 640
 // --output_file, -o: output txt file for voice segment start & stop time (in seconds). default: output.txt
 //
-// $ ./rnnvad_postprocess_sample -i vad_input.wav -o vad_output.txt
+// $ ./rnnvad_postprocess_stream_sample -i vad_input.wav -o vad_output.txt
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,8 +35,8 @@
 typedef struct vad_result
 {
     bool speech_trigger = false;              // flag to indicate if speech is detected
-    float real_bos = -1.0;                    // real begin time of speech (from head of audio file, in seconds)
-    float real_eos = -1.0;                    // real end time of speech (from head of audio file, in seconds)
+    int bos_shift = -1;                       // frame shift from real begin of speech to current time (frame number, >= 0)
+    int eos_shift = -1;                       // frame shift from real end of speech to current time (frame number, >= 0)
 } rnnvad_results;
 
 // VAD postprocess param structure
@@ -53,7 +53,6 @@ typedef struct vad_param
     int accum_silence_len = 0;
     int accum_speech_begin_len = 0;
     int accum_speech_inside_len = 0;
-    long total_frames = 0;                    // frames every 10ms or 160 samples
 } rnnvad_params;
 
 
@@ -83,8 +82,6 @@ bool clear_inner_accum_when_find_begin(rnnvad_params& vad_param)
 // smoothing per-frame VAD result
 void vad_smoothing(rnnvad_params& vad_param, rnnvad_results& vad_result, int language)
 {
-    vad_param.total_frames += 1;
-
     if (vad_result.speech_trigger) {
         // ----------------speech is active --------------------
         assert(!vad_param.vadprob_array.empty());
@@ -104,9 +101,9 @@ void vad_smoothing(rnnvad_params& vad_param, rnnvad_results& vad_result, int lan
                 vad_param.accum_speech_inside_len = 0;
             }
             if(vad_param.accum_silence_len >= ((language > 0 ? vad_param.max_silence_len_multilan : vad_param.max_silence_len) + vad_param.accum_speech_inside_len)) {
-                // clear VAD action & recover all VAD end related status
+                // clear VAD action, record end frame shift & recover all VAD end related status
                 vad_result.speech_trigger = false;
-                vad_result.real_eos = (vad_param.total_frames - vad_param.accum_silence_len)  * (float)(RNNOISE_FRAME_SIZE) / (float)(RNNOISE_SAMPLE_RATE);
+                vad_result.eos_shift = vad_param.accum_silence_len;
                 clear_inner_accum_after_end(vad_param);
             }
         } // end of if vad_param.speech_maybe_ending
@@ -123,7 +120,7 @@ void vad_smoothing(rnnvad_params& vad_param, rnnvad_results& vad_result, int lan
     } // end of if speech trigger
     else {
         // ----------------speech is not active --------------------
-        vad_result.real_bos = -1.0;
+        vad_result.bos_shift = -1;
         if(static_cast<int> (vad_param.vadprob_array.size()) < vad_param.speech_activate_windows_size)
             return;
 
@@ -135,10 +132,10 @@ void vad_smoothing(rnnvad_params& vad_param, rnnvad_results& vad_result, int lan
         } else if(vad_param.vadprob_array.back() == 1) {
             vad_param.accum_speech_begin_len += 1;
             if (vad_param.accum_speech_begin_len >= vad_param.min_speech_len) {
-                // trigger VAD active
+                // trigger VAD active & record begin frame shift
                 vad_result.speech_trigger = true;
                 vad_param.accum_speech_begin_len = 0;
-                vad_result.real_bos = (vad_param.total_frames - vad_param.min_speech_len) * (float)(RNNOISE_FRAME_SIZE) / (float)(RNNOISE_SAMPLE_RATE);
+                vad_result.bos_shift = vad_param.min_speech_len;
             }
             // ----------------------------------------------------------------
         }
@@ -270,13 +267,11 @@ int rnnvad_postprocess_sample(char* input_file, int chunk_size, char* output_fil
             if (vad_status != prev_vad_status) {
                 if ((prev_vad_status == 0) && (vad_status == 1)) {
                     // found VAD start point, record start time
-                    //voice_start_time = ((float)(i*chunk_size + j*RNNOISE_FRAME_SIZE)) / (float)(RNNOISE_SAMPLE_RATE);
-                    voice_start_time = vad_result.real_bos;
+                    voice_start_time = ((float)(i*chunk_size + (j-vad_result.bos_shift)*RNNOISE_FRAME_SIZE)) / (float)(RNNOISE_SAMPLE_RATE);
                     prev_vad_status = vad_status;
                 } else if ((prev_vad_status == 1) && (vad_status == 0)) {
                     // found VAD stop point, write the segment start & stop time into output file
-                    //voice_stop_time = ((float)(i*chunk_size + j*RNNOISE_FRAME_SIZE)) / (float)(RNNOISE_SAMPLE_RATE);
-                    voice_stop_time = vad_result.real_eos;
+                    voice_stop_time = ((float)(i*chunk_size + (j-vad_result.eos_shift)*RNNOISE_FRAME_SIZE)) / (float)(RNNOISE_SAMPLE_RATE);
                     fprintf(fp_output, "%.3f,%.3f\n", voice_start_time, voice_stop_time);
                     // reset status
                     prev_vad_status = vad_status;
@@ -308,7 +303,7 @@ int rnnvad_postprocess_sample(char* input_file, int chunk_size, char* output_fil
 
 void display_usage()
 {
-    printf("Usage: rnnvad_postprocess_sample\n" \
+    printf("Usage: rnnvad_postprocess_stream_sample\n" \
            "--input_file, -i: input raw audio file. default: 'input.wav'\n" \
            "--chunk_size, -c: audio chunk size to read every time. default: 640\n" \
            "--output_file, -o: output txt file for voice timestamps. default: output.txt\n" \

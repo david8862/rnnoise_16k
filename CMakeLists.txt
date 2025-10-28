@@ -91,6 +91,6 @@ install(TARGETS ${LIBRNNOISE} EXPORT RNNoiseTargets DESTINATION ${CMAKE_INSTALL_
 
 install(FILES ${LIBRNNOISE_HDRS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-set(RNNOISE_SAMPLES rnnoise_sample rnnvad_sample rnnvad_postprocess_sample)
+set(RNNOISE_SAMPLES rnnoise_sample rnnvad_sample rnnvad_postprocess_sample rnnvad_postprocess_stream_sample)
 install(TARGETS ${RNNOISE_SAMPLES} DESTINATION ${CMAKE_INSTALL_BINDIR}/samples)
 
