@@ -2,7 +2,7 @@
 
 ## Introduction
 
-An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rate audio. Implement with tf.keras, including model training/tuning, model evaluation, trained model export (PB/ONNX/TFLITE) and on device deployment (TFLITE/MNN).
+An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rate audio. Implement with tf.keras, including model training/tuning, model evaluation, trained model export (ONNX) and on device deployment (C/CPP).
 
 
 ## Guide of train/evaluate/demo
@@ -12,7 +12,6 @@ An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rat
 1. Install requirements on Ubuntu 18.04/20.04:
 
 ```
-# apt install ffmpeg portaudio19-dev
 # pip install -r requirements.txt
 ```
 
@@ -168,11 +167,12 @@ With new tranied model weights in `src/rnn_data.c`, we can build rnnoise lib & s
 
 ```
 # cd ..
+# mkdir build && cd build
 # cmake [-DCMAKE_TOOLCHAIN_FILE=<cross-compile toolchain file>] ..
 # make && make install
 ```
 
-The built rnnoise & rnnvad sample could be found at `src/rnn_data.c`, which can be used for inference with .wav audio:
+The built rnnoise & rnnvad sample could be found at `build/install/bin/samples/`, which can be used for inference with .wav audio:
 
 ```
 # cd build/install/bin/samples/
@@ -216,7 +216,7 @@ The rnnoise sample will generate a denoised pcm audio file (single channel, 16k,
 ### Evaluation
 For rnnoise sample, currently not providing any evaluation metric & tool.
 
-For rnnvad sample, you can use [vad_eval.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/evaluation/vad_eval.py) to evaluate VAD related metric (hit rate/accuracy/F1 score/etc):
+For rnnvad sample, you can use [vad_eval.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/evaluation/vad_eval.py) to evaluate VAD related metric (match rate/accuracy/F1 score/etc):
 
 ```
 # cd tools/evaluation/

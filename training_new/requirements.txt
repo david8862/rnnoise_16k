@@ -1,0 +1,10 @@
+numpy
+setuptools
+scipy
+tensorflow==2.10.0
+matplotlib
+tqdm
+pillow
+tf2onnx
+onnx
+onnxruntime
