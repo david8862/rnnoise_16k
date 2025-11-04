@@ -9,7 +9,7 @@ An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rat
 
 ### Train
 
-1. Install requirements on Ubuntu 18.04/20.04:
+1. Install requirements on Ubuntu 22.04/24.04:
 
 ```
 # pip install -r requirements.txt
@@ -79,7 +79,9 @@ An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rat
 
 ```
 # python train.py -h
-usage: train.py [-h] [--window_size WINDOW_SIZE] [--weights_path WEIGHTS_PATH]
+usage: train.py [-h] [--bands_num BANDS_NUM] [--delta_ceps_num DELTA_CEPS_NUM]
+                [--sequence_length SEQUENCE_LENGTH]
+                [--weights_path WEIGHTS_PATH]
                 --train_data_file TRAIN_DATA_FILE
                 [--val_split VAL_SPLIT]
                 [--batch_size BATCH_SIZE]
@@ -94,8 +96,12 @@ train RNNoise model
 
 options:
   -h, --help            show this help message and exit
-  --window_size WINDOW_SIZE
-                        input window size, default=2000
+  --bands_num BANDS_NUM
+                        number of bands, default=18
+  --delta_ceps_num DELTA_CEPS_NUM
+                        number of delta ceps, default=6
+  --sequence_length SEQUENCE_LENGTH
+                        input sequence length, default=2000
   --weights_path WEIGHTS_PATH
                         Pretrained model/weights file for fine tune
   --train_data_file TRAIN_DATA_FILE
@@ -120,11 +126,11 @@ options:
 
 Following is reference config cmd for training:
 ```
-# python train.py --window_size=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --decay_type=cosine --transfer_epoch=5 --total_epoch=100
+# python train.py --bands_num=18 --delta_ceps_num=6 --sequence_length=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --decay_type=cosine --transfer_epoch=5 --total_epoch=100
 ```
 or training on GPU 0, 1 and 2, if you have several GPUs on your host/server:
 ```
-# CUDA_VISIBLE_DEVICES=0,1,2 python train.py --window_size=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --decay_type=cosine --transfer_epoch=5 --total_epoch=100
+# CUDA_VISIBLE_DEVICES=0,1,2 python train.py --bands_num=18 --delta_ceps_num=6 --sequence_length=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --decay_type=cosine --transfer_epoch=5 --total_epoch=100
 ```
 
 Checkpoints during training could be found at `logs/000/`. Choose a best one as result
@@ -168,7 +174,8 @@ With new tranied model weights in `src/rnn_data.c`, we can build rnnoise lib & s
 ```
 # cd ..
 # mkdir build && cd build
-# cmake [-DCMAKE_TOOLCHAIN_FILE=<cross-compile toolchain file>] ..
+# cmake [-DCMAKE_TOOLCHAIN_FILE=<cross-compile toolchain file>]
+        [-DRNNOISE_BUILD_SHARED_LIBS=OFF] ..
 # make && make install
 ```
 
@@ -275,7 +282,7 @@ usage: keras_to_onnx.py [-h] --keras_model_file KERAS_MODEL_FILE
                              --output_file OUTPUT_FILE
                              [--op_set OP_SET]
                              [--batch_size BATCH_SIZE]
-                             [--window_size WINDOW_SIZE]
+                             [--sequence_length SEQUENCE_LENGTH]
 
 Convert RNNoise tf.keras model to ONNX model
 
@@ -285,18 +292,18 @@ options:
                         path to keras model file
   --output_file OUTPUT_FILE
                         output onnx model file
-  --op_set OP_SET       onnx op set, default=10
+  --op_set OP_SET       onnx op set, default=14
   --batch_size BATCH_SIZE
                         assign batch size if not specified in keras model, default=1
-  --window_size WINDOW_SIZE
-                        assign window size if not specified in keras model, default=2000
+  --sequence_length SEQUENCE_LENGTH
+                        assign sequence length if not specified in keras model, default=2000
 
 # python keras_to_onnx.py
     --keras_model_file="path/to/keras/model.h5"
     --output_file="path/to/save/model.onnx"
     --op_set=14
     --batch_size=1
-    --window_size=2000
+    --sequence_length=2000
 ```
 
 ### TODO

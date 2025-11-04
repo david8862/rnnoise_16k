@@ -2,6 +2,12 @@
 # -*- coding=utf-8 -*-
 """
 Train RNNoise model
+
+Reference:
+https://arxiv.org/pdf/1709.08243
+https://blog.csdn.net/u011792766/article/details/119468692
+https://blog.csdn.net/danteLiujie/article/details/102799038
+https://webrtc.org.cn/rnnoise-basic-knowledge/
 """
 import os, sys, argparse, time
 
@@ -42,13 +48,13 @@ def train(args):
     callbacks = [logging, checkpoint, early_stopping, terminate_on_nan, checkpoint_clean]
 
     # prepare train dataset
-    x_train, y_train, vad_train = get_train_data(args.train_data_file, args.window_size)
+    x_train, y_train, vad_train = get_train_data(args.train_data_file, bands_num=args.bands_num, delta_ceps_num=args.delta_ceps_num, sequence_length=args.sequence_length)
 
     # prepare optimizer
     optimizer = get_optimizer(args.optimizer, args.learning_rate)
 
     # get train model
-    model = get_model(weights_path=args.weights_path)
+    model = get_model(bands_num=args.bands_num, delta_ceps_num=args.delta_ceps_num, weights_path=args.weights_path)
     model.summary()
 
     # Freeze most layers and only tuning 2 output dense head for transfer learning
@@ -116,12 +122,16 @@ def train(args):
 def main():
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS, description='train RNNoise model')
     # Model definition options
-    #parser.add_argument('--model_type', type=str, required=False, default='mobilenetv2',
-    #    help='backbone model type: mobilenetv3/v2/simple_cnn, default=%(default)s')
-    parser.add_argument('--window_size', type=int, required=False, default=2000,
-        help="input window size, default=%(default)s")
+    # input feature number = bands_num + 3*delta_ceps_num + 2
+    # output feature number = bands_num
+    parser.add_argument('--bands_num', type=int, required=False, default=18,
+        help="number of bands, default=%(default)s")
+    parser.add_argument('--delta_ceps_num', type=int, required=False, default=6,
+        help="number of delta ceps, default=%(default)s")
+    parser.add_argument('--sequence_length', type=int, required=False, default=2000,
+        help="input sequence length, default=%(default)s")
     parser.add_argument('--weights_path', type=str, required=False, default=None,
-        help = "Pretrained model/weights file for fine tune")
+        help="pretrained model/weights file for fine tune, default=%(default)s")
 
     # Data options
     parser.add_argument('--train_data_file', type=str, required=True,

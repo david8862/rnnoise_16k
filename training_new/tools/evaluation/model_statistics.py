@@ -75,23 +75,23 @@ def main():
     parser = argparse.ArgumentParser(description='tf.keras model FLOPs & PARAMs checking tool')
     parser.add_argument('--model_path', type=str, required=True, help='model file to evaluate')
     parser.add_argument('--batch_size', required=False, type=int, help='assign batch size if not specified in keras model, default=%(default)s', default=1)
-    parser.add_argument('--window_size', required=False, type=int, help='assign window size if not specified in keras model, default=%(default)s', default=2000)
+    parser.add_argument('--sequence_length', required=False, type=int, help='assign sequence length if not specified in keras model, default=%(default)s', default=2000)
     args = parser.parse_args()
 
     custom_object_dict = get_custom_objects()
     model = load_model(args.model_path, compile=False, custom_objects=custom_object_dict)
 
-    batch_size, window_size, feature_size = model.input.shape.as_list()
+    batch_size, sequence_length, feature_size = model.input.shape.as_list()
 
     # assign batch size if not specified in keras model
     if batch_size == 0 or batch_size is None:
        batch_size = args.batch_size
 
-    # assign window size if not specified in keras model
-    if window_size or window_size is None:
-       window_size = args.window_size
+    # assign sequence length if not specified in keras model
+    if sequence_length or sequence_length is None:
+       sequence_length = args.sequence_length
 
-    input_tensor = Input(shape=(window_size, feature_size), batch_size=1)
+    input_tensor = Input(shape=(sequence_length, feature_size), batch_size=1)
     output_tensor = model(input_tensor)
     model = Model(input_tensor, output_tensor)
 

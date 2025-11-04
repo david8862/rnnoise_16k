@@ -1,0 +1,8 @@
+numpy
+scipy
+torch
+torchsummary
+thop
+tqdm
+onnx
+onnxruntime

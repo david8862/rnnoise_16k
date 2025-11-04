@@ -27,11 +27,14 @@ class WeightClip(Constraint):
 
 
 
-def get_model(batch_size=None, weights_path=None):
+def get_model(bands_num=18, delta_ceps_num=6, batch_size=None, weights_path=None):
     reg = 0.000001
     constraint = WeightClip(0.499)
 
-    input_tensor = Input(shape=(None, 38), batch_size=batch_size, name='feature_input')
+    input_dim = bands_num + 3*delta_ceps_num + 2
+    denoise_output_dim = bands_num
+
+    input_tensor = Input(shape=(None, input_dim), batch_size=batch_size, name='feature_input')
     input_dense = Dense(24, activation='tanh', name='input_dense', kernel_constraint=constraint, bias_constraint=constraint)(input_tensor)
 
     vad_gru = GRU(24, activation='tanh', recurrent_activation='sigmoid', return_sequences=True, name='vad_gru',
@@ -62,7 +65,7 @@ def get_model(batch_size=None, weights_path=None):
                       recurrent_constraint=constraint,
                       bias_constraint=constraint,
                       reset_after=False)(denoise_input)
-    denoise_output = Dense(18, activation='sigmoid', name='denoise_output',
+    denoise_output = Dense(denoise_output_dim, activation='sigmoid', name='denoise_output',
                            kernel_constraint=constraint,
                            bias_constraint=constraint)(denoise_gru)
 

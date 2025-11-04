@@ -16,7 +16,7 @@ from common.utils import get_custom_objects
 os.environ['TF_KERAS'] = '1'
 
 
-def onnx_convert(keras_model_file, output_file, op_set, batch_size, window_size):
+def onnx_convert(keras_model_file, output_file, op_set, batch_size, sequence_length):
     import tf2onnx
     custom_object_dict = get_custom_objects()
     model = load_model(keras_model_file, compile=False, custom_objects=custom_object_dict)
@@ -29,9 +29,9 @@ def onnx_convert(keras_model_file, output_file, op_set, batch_size, window_size)
     if input_shape[0] == 0 or input_shape[0] is None:
        input_shape[0] = batch_size
 
-    # assign window size if not specified in keras model
+    # assign sequence length if not specified in keras model
     if input_shape[1] == 0 or input_shape[1] is None:
-       input_shape[1] = window_size
+       input_shape[1] = sequence_length
 
     spec = (tf.TensorSpec(shape=input_shape, dtype=tf.float32, name="feature_input"),)
 
@@ -44,13 +44,13 @@ def main():
     parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS, description='Convert RNNoise tf.keras model to ONNX model')
     parser.add_argument('--keras_model_file', required=True, type=str, help='path to keras model file')
     parser.add_argument('--output_file', required=True, type=str, help='output onnx model file')
-    parser.add_argument('--op_set', required=False, type=int, help='onnx op set, default=%(default)s', default=10)
+    parser.add_argument('--op_set', required=False, type=int, help='onnx op set, default=%(default)s', default=14)
     parser.add_argument('--batch_size', required=False, type=int, help='assign batch size if not specified in keras model, default=%(default)s', default=1)
-    parser.add_argument('--window_size', required=False, type=int, help='assign window size if not specified in keras model, default=%(default)s', default=2000)
+    parser.add_argument('--sequence_length', required=False, type=int, help='assign sequence length if not specified in keras model, default=%(default)s', default=2000)
 
     args = parser.parse_args()
 
-    onnx_convert(args.keras_model_file, args.output_file, args.op_set, args.batch_size, args.window_size)
+    onnx_convert(args.keras_model_file, args.output_file, args.op_set, args.batch_size, args.sequence_length)
 
     print('\nDone. ONNX model has been saved to', args.output_file)
 
