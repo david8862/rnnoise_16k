@@ -129,8 +129,8 @@ def calculate_vad_event_metrics(reference_labels, predicted_labels, min_silence_
         insertion_rate = insertions / total_reference_segments
 
     # 计算基于时间的指标（可选）
-    total_reference_frames = np.sum(reference_labels)
-    total_predicted_frames = np.sum(predicted_labels)
+    #total_reference_frames = np.sum(reference_labels)
+    #total_predicted_frames = np.sum(predicted_labels)
 
     # 计算帧级的准确率指标作为补充
     true_positives = np.sum((reference_labels == 1) & (predicted_labels == 1))
@@ -187,7 +187,7 @@ def visualize_result(annotation_array, result_array, audio_duration, height=480,
     #plt.ylabel('Annotation (down) & Prediction (up)', fontsize='large')
 
     # use time as x-ticks, label as y-ticks
-    xticks_labels = range(0, int(audio_duration), int(audio_duration)//10)
+    xticks_labels = range(0, int(audio_duration), int(audio_duration)//10 if audio_duration > 10.0 else 1)
     plt.xticks(np.linspace(0, width, num=len(xticks_labels), endpoint=True), xticks_labels)
     yticks_labels = ['', 'Prediction', '', 'Annotation', '']
     plt.yticks(np.linspace(0, height, num=len(yticks_labels), endpoint=True), yticks_labels)
@@ -219,7 +219,7 @@ def vad_eval(annotation_txt_path, result_txt_path, min_silence_duration, overlap
 
     total_annotation_vad = np.empty(0, dtype=int)
     total_result_vad = np.empty(0, dtype=int)
-    #total_sample_num = 0
+    total_annotation_audio_duration = 0.0
 
     # check every annotation txt file
     pbar = tqdm(total=len(annotation_txt_list), desc='VAD evaluation')
@@ -283,6 +283,7 @@ def vad_eval(annotation_txt_path, result_txt_path, min_silence_duration, overlap
         # merge single audio vad result into total result
         total_annotation_vad = np.concatenate((total_annotation_vad, annotation_vad), axis=0)
         total_result_vad = np.concatenate((total_result_vad, result_vad), axis=0)
+        total_annotation_audio_duration += annotation_audio_duration
         #total_sample_num += annotation_sample_num
         pbar.update(1)
     pbar.close()
@@ -294,7 +295,7 @@ def vad_eval(annotation_txt_path, result_txt_path, min_silence_duration, overlap
     print("VAD metric report:")
     print("=" * 50)
     print(f"hit number: {metrics['hits']}")
-    print(f"match rate: {match_rate}")
+    print(f"match rate: {match_rate:.3f}")
     print(f"deletion error number: {metrics['deletions']}")
     print(f"insertion error number: {metrics['insertions']}")
     print(f"deletion error rate: {metrics['deletion_rate']:.3f} ({metrics['deletion_rate']*100:.1f}%)")
@@ -308,15 +309,15 @@ def vad_eval(annotation_txt_path, result_txt_path, min_silence_duration, overlap
     print(f"F1 score: {metrics['f1_score']:.3f}")
 
     if visualize:
-        visualize_result(total_annotation_vad, total_result_vad, annotation_audio_duration)
+        visualize_result(total_annotation_vad, total_result_vad, total_annotation_audio_duration)
 
 
 def main():
     parser = argparse.ArgumentParser(description='tool to evaluate VAD metrics')
     parser.add_argument('--annotation_txt_path', type=str, required=True,
-                        help='file or directory for voice timestamp annotation txt file')
+                        help='file or directory for voice timestamp annotation txt')
     parser.add_argument('--result_txt_path', type=str, required=True,
-                        help='file or directory for voice timestamp detect result txt file')
+                        help='file or directory for voice timestamp detect result txt')
     parser.add_argument('--min_silence_duration', type=int, required=False, default=30,
                         help='minimum silence sample number to start a new voice segment. default=%(default)s')
     parser.add_argument('--overlap_threshold', type=float, required=False, default=0.3,

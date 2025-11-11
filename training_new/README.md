@@ -75,6 +75,58 @@ An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rat
     Done. Audio feature matrix has been saved to train_data.h5
     ```
 
+    * To annotate speech timestamp (start/stop time of a speech segment) info of audio file for VAD evaluation, you can use [SubtitleEdit](https://www.nikse.dk/subtitleedit) to load & edit .srt format subtitle file & corresponding audio file. With 4.0.13 & later version, you can even use Whisper ASR large model inside SubtitleEdit to automatically generate subtitle info for an audio. For plenty of audio files, [whisper_to_srt.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/dataset_converter/whisper_to_srt.py) can be used to batch generate .srt format subtitle files. Then you can use [srt_to_txt.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/dataset_converter/srt_to_txt.py) to convert the subtitle file to voice timestamp txt file.
+
+    ```
+    # cd tools/dataset_converter/
+    # python whisper_to_srt.py -h
+    usage: whisper_to_srt.py [-h] --input_audio_path INPUT_AUDIO_PATH
+                             [--model_type {tiny.en,tiny,base.en,base,small.en,small,medium.en,medium,large-v1,large-v2,large-v3,large,large-v3-turbo,turbo}]
+                             [--language {None,zh,en,fr,de,it,es,ja,ko,ru,tr,th}]
+                             [--no_speech_threshold NO_SPEECH_THRESHOLD]
+                             [--fp16]
+                             [--output_path OUTPUT_PATH]
+
+    tool to generate .srt subtitle file with OpenAI Whisper model
+
+    options:
+      -h, --help            show this help message and exit
+      --input_audio_path INPUT_AUDIO_PATH
+                            file or directory for input .wav audio files
+      --model_type {tiny.en,tiny,base.en,base,small.en,small,medium.en,medium,large-v1,large-v2,large-v3,large,large-v3-turbo,turbo}
+                            Whisper model type to use. default=large-v3-turbo
+      --language {None,zh,en,fr,de,it,es,ja,ko,ru,tr,th}
+                            Target language to transcribe, None for auto-detect. default=None
+      --no_speech_threshold NO_SPEECH_THRESHOLD
+                            threshold to judge if an audio segment contains speech. default=0.8
+      --fp16                Whether to use fp16 inference. default=False
+      --output_path OUTPUT_PATH
+                            output path to save .srt subtitle files. default=output
+
+    # python whisper_to_srt.py --input_audio_path=<dataset path>/speech/ --model_type=large-v3-turbo --language=tr --output_path=<dataset path>/subtitle/
+
+
+    # python srt_to_txt.py -h
+    usage: srt_to_txt.py [-h] --input_audio_path INPUT_AUDIO_PATH
+                         --input_srt_path INPUT_SRT_PATH
+                         [--output_path OUTPUT_PATH]
+
+    Tool to convert .srt audio subtitle text file to voice timestamp txt file
+
+    options:
+      -h, --help            show this help message and exit
+      --input_audio_path INPUT_AUDIO_PATH
+                            file or directory for input wav audio file
+      --input_srt_path INPUT_SRT_PATH
+                            file or directory for input .srt subtitle text file
+      --output_path OUTPUT_PATH
+                            output path to save voice timestamp txt file. default=output
+
+    # python srt_to_txt.py --input_audio_path=<dataset path>/speech/ --input_srt_path=<dataset path>/subtitle/ --output_path=<dataset path>/annotation/
+
+    ```
+
+
 3. [train.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/train.py)
 
 ```
@@ -221,7 +273,45 @@ The rnnoise sample will generate a denoised pcm audio file (single channel, 16k,
 ```
 
 ### Evaluation
-For rnnoise sample, currently not providing any evaluation metric & tool.
+For rnnoise sample, you can use [denoise_eval.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/evaluation/denoise_eval.py) to evaluate Denoise related metric (SNR/PESQ/STOI/etc):
+
+```
+# cd tools/evaluation/
+# python denoise_eval.py -h
+usage: denoise_eval.py [-h] --clean_voice_path CLEAN_VOICE_PATH
+                            --noisy_voice_path NOISY_VOICE_PATH
+                            --denoised_voice_path DENOISED_VOICE_PATH
+                            [--metric_type {SNR,SI-SNR,SI-SDR,PESQ,STOI}]
+                            [--sample_rate {None,8000,16000,22050,44100,48000}]
+                            [--visualize]
+
+tool to evaluate Denoise metrics
+
+options:
+  -h, --help            show this help message and exit
+  --clean_voice_path CLEAN_VOICE_PATH
+                        file or directory for original clean voice audio
+  --noisy_voice_path NOISY_VOICE_PATH
+                        file or directory for noisy voice audio
+  --denoised_voice_path DENOISED_VOICE_PATH
+                        file or directory for denoised voice audio
+  --metric_type {SNR,SI-SNR,SI-SDR,PESQ,STOI}
+                        voice quality metric type, default=SNR
+  --sample_rate {None,8000,16000,22050,44100,48000}
+                        (optional) target sample rate, None is unchange. default=None
+  --visualize           Whether to visualize denoise metric result
+
+# python denoise_eval.py --clean_voice_path=<dataset path>/speech/ --noisy_voice_path=<dataset path>/noisy/ --denoised_voice_path=<dataset path>/denoised/ --metric_type=SNR --visualize
+Denoise evaluation: 100%|████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [00:01<00:00,  2.92it/s]
+Metric type: SNR
+average noisy SNR: 0.008044878952205181 dB
+average denoised SNR: -1.1493064165115356 dB
+average SNR improvement: -1.1573511362075806 dB
+```
+<p align="center">
+  <img src="assets/denoise_eval.png">
+</p>
+
 
 For rnnvad sample, you can use [vad_eval.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/evaluation/vad_eval.py) to evaluate VAD related metric (match rate/accuracy/F1 score/etc):
 
@@ -307,7 +397,6 @@ options:
 ```
 
 ### TODO
-- [ ] RNNoise sample evaluation
 - [ ] Inference model deployment with common infrastructure (e.g MNN/TFLITE)
 
 

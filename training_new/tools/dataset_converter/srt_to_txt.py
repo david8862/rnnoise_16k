@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """ Tool to convert .srt audio subtitle text file to voice timestamp txt file
+Reference:
+https://www.nikse.dk/subtitleedit
+https://aegisub.org/
 """
 import os, sys, argparse
 import glob

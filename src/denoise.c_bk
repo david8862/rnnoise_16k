@@ -581,7 +581,57 @@ float calculate_wav_energy(float *wav_buffer, uint64_t sampleCount){
 
 }
 
+
+
 void get_file_list(DIR *dir, char* path, char **file_list, int *count){
+    struct dirent *entry;
+    char single_file[120];
+    //char list_tmp[1000][1000];
+    while ((entry = readdir(dir))!=NULL){
+
+        if(strcmp(entry->d_name,".")==0 || strcmp(entry->d_name,"..")==0)
+        {continue;
+        }else{
+
+
+            sprintf(single_file,"%s/%s",path,entry->d_name); //构成文件全路径v
+            //printf("speech single file full path name === %s \n", single_file);
+            strcpy(file_list[*count], single_file);
+            (*count) ++;
+        }
+    }
+
+}
+
+void get_file_list2(DIR *dir, char* path, char **file_list, int *count){
+    struct dirent *entry;
+    char single_file[120];
+    char *pFile;
+    while ((entry = readdir(dir))!=NULL){
+        //printf("this file  ===== %s\n", entry->d_name);
+        pFile = strchr(entry->d_name, '.');
+        if (pFile!=NULL) {
+            //printf("file things ==== %s\n", pFile);
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(pFile, ".wav") != 0) {
+                continue;
+            }
+            //  printf("check ===== %s\n", entry->d_name);
+
+            sprintf(single_file, "%s/%s", path, entry->d_name); //构成文件全路径v
+            // printf("count %d, wav single file full path name === %s \n", *count, single_file);
+            strcpy(file_list[*count], single_file);
+            (*count) ++;
+
+        }else{
+            continue;
+        }
+    }
+    printf("num of file in directory ====== %d\n",*count);
+
+}
+
+
+void get_file_list3(DIR *dir, char* path, char **file_list, int *count){
     struct dirent *entry;
     char single_file[120];
     char *pFile;
@@ -633,13 +683,26 @@ float *wavRead_f32(const char *filename, uint32_t *sampleRate, uint64_t *sampleC
 
 }
 
-float  *open_file(char **dir_list, int file_list_len, uint32_t *sampleRate, uint64_t *sampleCount, uint32_t *channels)
+float  *open_file(char **dir_list, int file_list_len, uint32_t *sampleRate, uint64_t *sampleCount, uint32_t *channels, int flag)
+
 {
+
+    //srand((unsigned)time(NULL));
     int i = rand()%(file_list_len);
+//    if (flag ==1) {
+//        //printf(" This should be speech file, %d th file === File_name ===  %s \n",i, dir_list[i]);
+//    }else{
+//        //printf(" This should be noise file , %d th file === File_name ===  %s \n",i, dir_list[i]);
+//    }
+    //fprintf(stderr, "open file name =================== %s\n", dir_list[i]);
+
+    //char *filename = "/media/yongyug/DATA/new_train/noise_dir/noise-free-sound-0711.wav";
     float *buffer = wavRead_f32(dir_list[i], sampleRate, sampleCount, channels);
 
+    //printf("Energy ============= %f\n", *Energy);
     return buffer;
 }
+
 #endif
 
 
@@ -700,7 +763,11 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
 
     int vad_cnt=0;
     int gain_change_count=0;
+    //float speech_gain = 1, noise_gain = 1;
     int speech_flag = 1, noise_flag = 1;
+    //char *out_file = argv[4];
+
+    //char* feature_file = argv[5];
 
     DenoiseState *st;
     DenoiseState *noise_state;
@@ -708,6 +775,10 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
     st = rnnoise_create();
     noise_state = rnnoise_create();
     noisy = rnnoise_create();
+    //if (argc!=6) {
+    //    fprintf(stderr, "usage: %s <speech> <noise> <loop num> <output mixed> <output feature>\n", argv[0]);
+    //    return 1;
+    //}
 
     char **speech_array = (char**)malloc(sizeof(char*) * MAX_FILE);
     char **noise_array = (char**)malloc(sizeof(char*) * MAX_FILE);
@@ -732,15 +803,17 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
         return -1;
     }
     else{
-        get_file_list(dirSpeech, speech_path, speech_array, &speechcount);
+        get_file_list3(dirSpeech, speech_path, speech_array, &speechcount);
         //printf("check if get count %d \n",speechcount);
 
-        get_file_list(dirNoise, noise_path, noise_array, &noisecount);
+        get_file_list3(dirNoise, noise_path, noise_array, &noisecount);
         //printf("check if get count %d \n",noisecount);
     }
     closedir(dirSpeech);
     closedir(dirNoise);
     srand((unsigned)time(NULL));
+
+
 
     float *speech_buffer=NULL;
     float *noise_buffer=NULL;
@@ -767,108 +840,114 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
 
     FILE* fp_feature = fopen(output_feature_file, "wb");
 
+    //int loop_num = strtol(argv[3], NULL, 10);
     while (1)
     {
+        //int frames_count = 0;
         kiss_fft_cpx X[FREQ_SIZE], Y[FREQ_SIZE], N[FREQ_SIZE], P[WINDOW_SIZE];
         float Ex[NB_BANDS], Ey[NB_BANDS], En[NB_BANDS], Ep[NB_BANDS];
         float Exp[NB_BANDS];
         float Ln[NB_BANDS];
         float features[NB_FEATURES];
         float g[NB_BANDS];
-        //float gf[FREQ_SIZE]={1};
-        //short tmp[FRAME_SIZE];
+        float gf[FREQ_SIZE]={1};
+        short tmp[FRAME_SIZE];
 
         float vad=0;
-        //float vad_prob;
+        float vad_prob;
         float E=0;
-
-        if (count >= loop_num)
-            break;
+        //if (count==1000000) break;
+        if (count >= loop_num) break;
         //fprintf(stderr, "count ==== %d\n", count);
 
+
+        //if (count==50000000) break;
         if (++gain_change_count > 2821) {
 
-            if (rand()%10==0)
-                noise_flag = 0;
-            else
-                noise_flag = 1;
+        if (rand()%10==0) noise_flag = 0; else noise_flag = 1;
+        if (rand()%10==0) speech_flag = 0; else speech_flag = 1;
+        expcected_SNR = rand()%20;
 
-            if (rand()%10==0)
-                speech_flag = 0;
-            else
-                speech_flag = 1;
+        gain_change_count = 0;
 
-            expcected_SNR = rand()%20;
+        rand_resp(a_noise, b_noise);
+        rand_resp(a_sig, b_sig);
+        lowpass = FREQ_SIZE * 3000./8000. * pow(50., rand()/(double)RAND_MAX);
 
-            gain_change_count = 0;
-            rand_resp(a_noise, b_noise);
-            rand_resp(a_sig, b_sig);
-            lowpass = FREQ_SIZE * 3000./8000. * pow(50., rand()/(double)RAND_MAX);
-
-            //fprintf(stderr,"low pass ==== %f  \n",  FREQ_SIZE * 3000./8000. * pow(50., rand()/(double)RAND_MAX));
-            for (i=0;i<NB_BANDS;i++) {
-                if (eband5ms[i]<<FRAME_SIZE_SHIFT > lowpass) {
-                    band_lp = i;
-                    break;
+        //fprintf(stderr,"low pass ==== %f  \n",  FREQ_SIZE * 3000./8000. * pow(50., rand()/(double)RAND_MAX));
+        for (i=0;i<NB_BANDS;i++) {
+            if (eband5ms[i]<<FRAME_SIZE_SHIFT > lowpass) {
+                band_lp = i;
+                break;
                 }
             }
         }
 
+
         if (speech_frames==0) {
             DRWAV_FREE(speech_buffer);
             speech_buffer = open_file(speech_array, speechcount,
-                                      &speech_sampleRate, &speech_sampleCount, &speech_channels);
+                                      &speech_sampleRate, &speech_sampleCount, &speech_channels, 1);
             speech_energy = calculate_wav_energy(speech_buffer, speech_sampleCount);
 
             speech_frames = speech_sampleCount / FRAME_SIZE;
             speech_input = speech_buffer;
         }
 
+
         if (speech_flag != 0) {
-            for (i = 0; i < FRAME_SIZE; i++)
-                x[i] = speech_input[i];
-            for (i = 0; i < FRAME_SIZE; i++)
-                E += speech_input[i] *  speech_input[i];
+
+            for (i = 0; i < FRAME_SIZE; i++) x[i] = speech_input[i];
+            for (i = 0; i < FRAME_SIZE; i++) E += speech_input[i] *  speech_input[i];
         } else {
-            for (i = 0; i < FRAME_SIZE; i++)
-                x[i] = 0;
+            for (i = 0; i < FRAME_SIZE; i++) x[i] = 0;
             E = 0;
         }
+
 
         if (noise_frames==0) {
             DRWAV_FREE(noise_buffer);
             noise_buffer = open_file(noise_array, noisecount,
-                                     &noise_sampleRate, &noise_sampleCount, &noise_channels);
+                                     &noise_sampleRate, &noise_sampleCount, &noise_channels, 1);
             noise_energy = calculate_wav_energy(noise_buffer, noise_sampleCount);
 
             noise_frames = noise_sampleCount / FRAME_SIZE;
             noise_input = noise_buffer;
         }
 
-        if (noise_flag != 0) {
-            double noise_factor = pow(10., (10*log10(speech_energy/noise_energy) - expcected_SNR) / 20);
-            //fprintf(stderr, "speech_energy %f ===, noise_energy ======= %f, noise_factor ==== %f\n", speech_energy, noise_energy, noise_factor);
-            for (i = 0; i < FRAME_SIZE; i++) {
-                n[i] = noise_factor * noise_input[i];
-                // fprintf(stderr, "speech_energy %f ===, noise_energy ======= %f, noise_factor ==== %f, noise_input === %f, n ====%f\n", speech_energy, noise_energy, noise_factor, noise_input[i], n[i]);
+            if (noise_flag != 0) {
+                double noise_factor = pow(10., (10*log10(speech_energy/noise_energy) - expcected_SNR) / 20);
+
+                //fprintf(stderr, "speech_energy %f ===, noise_energy ======= %f, noise_factor ==== %f\n", speech_energy, noise_energy, noise_factor);
+                for (i = 0; i < FRAME_SIZE; i++) {
+                    n[i] = noise_factor * noise_input[i];
+                   // fprintf(stderr, "speech_energy %f ===, noise_energy ======= %f, noise_factor ==== %f, noise_input === %f, n ====%f\n", speech_energy, noise_energy, noise_factor, noise_input[i], n[i]);
+
+
+                }
+
+            } else {
+                for (i = 0; i < FRAME_SIZE; i++) n[i] = 0;
             }
-        } else {
-            for (i = 0; i < FRAME_SIZE; i++) n[i] = 0;
-        }
 
         for (i=0;i<FRAME_SIZE;i++) {
             xn[i] = x[i] + n[i];
             //fprintf(stderr, "xn ==== %f noise_factor = %f\n", n[i],noise_factor);
+
+
         }
         biquad(x, mem_hp_x, x, b_hp, a_hp, FRAME_SIZE);
         biquad(x, mem_resp_x, x, b_sig, a_sig, FRAME_SIZE);
         biquad(n, mem_hp_n, n, b_hp, a_hp, FRAME_SIZE);
         biquad(n, mem_resp_n, n, b_noise, a_noise, FRAME_SIZE);
-
+//
         for (i=0;i<FRAME_SIZE;i++) {
             xn[i] = x[i] + n[i];
+
             noisy_data[i] = (int16_t)drwav_clamp(xn[i], -32768, 32767);
+
         }
+
         drwav_write(pWav, FRAME_SIZE, noisy_data);
 
 
@@ -882,39 +961,45 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
             vad_cnt+=2;
         }
 
-        if (vad_cnt < 0)
-            vad_cnt = 0;
-        if (vad_cnt > 15)
-            vad_cnt = 15;
 
-        if (vad_cnt >= 10)
-            vad = 0;
-        else if (vad_cnt > 0)
-            vad = 0.5f;
+        if (vad_cnt < 0) vad_cnt = 0;
+        if (vad_cnt > 15) vad_cnt = 15;
+
+        if (vad_cnt >= 10) vad = 0;
+        else if (vad_cnt > 0) vad = 0.5f;
         else vad = 1.f;
 
         frame_analysis(st, Y, Ey, x);
         frame_analysis(noise_state, N, En, n);
+        for (int j = 0; j < FRAME_SIZE; j++) {
+          // fprintf(stderr, "XXXXXX ================ %f \n", noise_input[j]);
 
-        for (i=0;i<NB_BANDS;i++)
-            Ln[i] = log10(1e-2+En[i]);
+
+        }
+        for (i=0;i<NB_BANDS;i++) Ln[i] = log10(1e-2+En[i]);
 
         int silence = compute_frame_features(noisy, X, P, Ex, Ep, Exp, features, xn);
         pitch_filter(X, P, Ex, Ep, Exp, g);
         //printf("%f %d\n", noisy->last_gain, noisy->last_period);
         for (i=0;i<NB_BANDS;i++) {
-            g[i] = sqrt((Ey[i]+1e-3)/(Ex[i]+1e-3));
 
-            if (g[i] > 1)
-                g[i] = 1;
-            if (silence || i > band_lp)
-                g[i] = -1;
-            if (Ey[i] < 5e-2 && Ex[i] < 5e-2)
-                g[i] = -1;
-            if (vad==0 && noise_flag==0)
-                g[i] = -1;
-            //fprintf(stderr, "check gain ================ %f \n", g[i]);
+
+        g[i] = sqrt((Ey[i]+1e-3)/(Ex[i]+1e-3));
+
+
+
+            if (g[i] > 1) g[i] = 1;
+            if (silence || i > band_lp) g[i] = -1;
+            if (Ey[i] < 5e-2 && Ex[i] < 5e-2) g[i] = -1;
+            if (vad==0 && noise_flag==0) g[i] = -1;
+
+
+
+        // fprintf(stderr, "check gain ================ %f \n", g[i]);
+
+
         }
+
 
         speech_frames--;
         noise_frames--;
@@ -933,27 +1018,39 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
             show_progressbar(percentage, 100, 100);
         }
 
-        // save input feature, denoise output, band energy & vad output to feature matrix file
-        fwrite(features, sizeof(float), NB_FEATURES, fp_feature);
-        fwrite(g, sizeof(float), NB_BANDS, fp_feature);
-        fwrite(Ln, sizeof(float), NB_BANDS, fp_feature);
-        fwrite(&vad, sizeof(float), 1, fp_feature);
-
         #if 0
-        compute_rnn(&noisy->rnn, g, &vad_prob, features);
-        interp_band_gain(gf, g);
+            for (i=0;i<NB_FEATURES;i++) printf("%f ", features[i]);
+        for (i=0;i<NB_BANDS;i++) printf("%f ", g[i]);
+        for (i=0;i<NB_BANDS;i++) printf("%f ", Ln[i]);
+        printf("%f\n", vad);
+        #endif
         #if 1
-        for (i=0;i<FREQ_SIZE;i++) {
-            X[i].r *= gf[i];
-            X[i].i *= gf[i];
-        }
-        #endif
-        frame_synthesis(noisy, xn, X);
+        //for (int l = 0; l < NB_FEATURES; l++) {
+        //    fprintf(stderr, "matrix features ===== : %f \n ", features[l]);
+        //}
 
-        for (i=0;i<FRAME_SIZE;i++)
-            tmp[i] = n[i];
-        fwrite(tmp, sizeof(short), FRFAME_SIZE, fout);
+
+
+        fwrite(features, sizeof(float), NB_FEATURES, fp_feature);
+            fwrite(g, sizeof(float), NB_BANDS, fp_feature);
+            fwrite(Ln, sizeof(float), NB_BANDS, fp_feature);
+            fwrite(&vad, sizeof(float), 1, fp_feature);
         #endif
+        #if 0
+                compute_rnn(&noisy->rnn, g, &vad_prob, features);
+            interp_band_gain(gf, g);
+        #if 1
+            for (i=0;i<FREQ_SIZE;i++) {
+              X[i].r *= gf[i];
+              X[i].i *= gf[i];
+            }
+        #endif
+            frame_synthesis(noisy, xn, X);
+
+            for (i=0;i<FRAME_SIZE;i++) tmp[i] = n[i];
+            fwrite(tmp, sizeof(short), FRFAME_SIZE, fout);
+        #endif
+
     }
     drwav_uninit(pWav);
     fprintf(stderr, "\nDone. mixed audio has been saved to '%s', audio feature data has been saved to '%s'\n", output_audio_file, output_feature_file);
