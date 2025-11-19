@@ -176,6 +176,8 @@ options:
                         Total training epochs, default=100
 ```
 
+**NOTE**: if you change the default `--bands_num`, `--delta_ceps_num` and `--sequence_length` params in training, corresponding value need also to be used in [denoise.c](https://github.com/david8862/rnnoise_16k/blob/master/src/denoise.c), [keras_to_onnx.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/model_converter/keras_to_c.py) and [model_statistics.py](https://github.com/david8862/rnnoise_16k/blob/master/training_new/tools/evaluation/model_statistics.py), and the dataset generated in step 2 needs to be re-prepared.
+
 Following is reference config cmd for training:
 ```
 # python train.py --bands_num=18 --delta_ceps_num=6 --sequence_length=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --decay_type=cosine --transfer_epoch=5 --total_epoch=100

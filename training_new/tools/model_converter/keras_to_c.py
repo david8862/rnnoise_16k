@@ -54,6 +54,7 @@ def printLayer(f, hf, layer):
 def keras_to_c(keras_model_file, output_code_file, output_header_file):
     custom_object_dict = get_custom_objects()
     model = load_model(keras_model_file, compile=False, custom_objects=custom_object_dict)
+    model.summary()
 
     weights = model.get_weights()
 
@@ -94,7 +95,7 @@ def main():
 
     keras_to_c(args.keras_model_file, args.output_code_file, args.output_header_file)
 
-    print('\nDone. model weights has been dumped to{} & {}'.format(args.output_code_file, args.output_header_file))
+    print('\nDone. model weights has been dumped to {} & {}'.format(args.output_code_file, args.output_header_file))
 
 
 if __name__ == '__main__':

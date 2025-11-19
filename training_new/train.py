@@ -8,6 +8,11 @@ https://arxiv.org/pdf/1709.08243
 https://blog.csdn.net/u011792766/article/details/119468692
 https://blog.csdn.net/danteLiujie/article/details/102799038
 https://webrtc.org.cn/rnnoise-basic-knowledge/
+https://zhuanlan.zhihu.com/p/431275459
+https://zhuanlan.zhihu.com/p/645806592
+https://github.com/Xiaobin-Rong/gtcrn
+https://zhuanlan.zhihu.com/p/1917948785776099421
+https://modelscope.cn/models/iic/speech_frcrn_ans_cirm_16k/summary
 """
 import os, sys, argparse, time
 

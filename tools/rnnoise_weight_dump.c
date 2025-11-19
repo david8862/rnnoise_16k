@@ -29,11 +29,11 @@
 
 int dump_array(const char* name, const rnn_weight *data, int size, FILE* fp) {
     fprintf(fp, "static const rnn_weight %s[%d] = {\n", name, size);
-    int i = 0;
 
-    for(;i < size; ++i) {
+    for(int i=0;i<size;i++) {
         fprintf(fp, " %d,", (int)(data[i]));
-        if(i > 0 && i % 8 == 0)
+        //if(i > 0 && i % 8 == 0)
+        if( (i+1) % 8 == 0)
             fprintf(fp, "\n");
     }
 
