@@ -43,12 +43,13 @@ An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rat
     Usage: denoise_train_data_creator
     --speech_path, -s: path for speech wav audio file. default: ./speech/
     --noise_path, -n: path for noise wav audio file. default: ./noise/
+    --snr_range, -r: Sound Noise Ratio (SNR) range (dB) as <min_value>,<max_value>. default: 0,20
     --loop_num, -l: generate loop number. default: 10000
     --output_audio_file, -a: output mixed wav audio file. default: mixed.wav
     --output_feature_file, -f: output audio feature matrix file. default: train_data_16k_f32.bin
     --verbose, -v: whether to display audio feature details (0|1). default: 0
 
-    # ./denoise_train_data_creator -s <dataset path>/speech/ -n <dataset path>/noise/
+    # ./denoise_train_data_creator -s <dataset path>/speech/ -n <dataset path>/noise/ --snr_range -10,10
     ...
     [####################################################################################################] 100.0%
     Done. mixed audio has been saved to 'mixed.wav', audio feature data has been saved to 'train_data_16k_f32.bin'
@@ -136,6 +137,7 @@ usage: train.py [-h] [--bands_num BANDS_NUM] [--delta_ceps_num DELTA_CEPS_NUM]
                 [--weights_path WEIGHTS_PATH]
                 --train_data_file TRAIN_DATA_FILE
                 [--val_split VAL_SPLIT]
+                [--loss_weights LOSS_WEIGHTS]
                 [--batch_size BATCH_SIZE]
                 [--optimizer {adam,rmsprop,sgd}]
                 [--learning_rate LEARNING_RATE]
@@ -160,6 +162,8 @@ options:
                         h5 file for training dataset
   --val_split VAL_SPLIT
                         validation data persentage in dataset, default=0.1
+  --loss_weights LOSS_WEIGHTS
+                        loss weights coefficient as '<denoise_loss>,<vad_loss>', default=10,0.5
   --batch_size BATCH_SIZE
                         batch size for train, default=64
   --optimizer {adam,rmsprop,sgd}

@@ -679,7 +679,7 @@ void show_progressbar(int progress, int total, int barWidth)
 }
 
 
-int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num, char* output_audio_file, char* output_feature_file, int verbose)
+int denoise_train_data_creator(char* speech_path, char* noise_path, char* snr_range_string, int loop_num, char* output_audio_file, char* output_feature_file, int verbose)
 {
     int i;
     int count=0;
@@ -725,6 +725,14 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
     float speech_energy = 0;
     float noise_energy = 0;
     float expcected_SNR = 0.0;
+
+    // parse min & max SNR from SNR range string
+    int min_SNR = 0;
+    int max_SNR = 0;
+    sscanf(snr_range_string, "%d,%d", &min_SNR, &max_SNR);
+    int SNR_range = max_SNR - min_SNR;
+    //printf("min_SNR=%d, max_SNR=%d, SNR_range=%d\n", min_SNR, max_SNR, SNR_range);
+
     //if((dirSpeech = opendir(argv[1])) == NULL || (dirNoise = opendir(argv[2])) == NULL)
     if((dirSpeech = opendir(speech_path)) == NULL || (dirNoise = opendir(noise_path)) == NULL)
     {
@@ -798,7 +806,10 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
             else
                 speech_flag = 1;
 
-            expcected_SNR = rand()%20;
+            // pick a random SNR from (min_SNR, max_SNR)
+            expcected_SNR = rand() % SNR_range + min_SNR;
+            //expcected_SNR = rand()%20;
+            //printf("expcected_SNR=%f\n", expcected_SNR);
 
             gain_change_count = 0;
             rand_resp(a_noise, b_noise);
@@ -846,7 +857,9 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, int loop_num
         }
 
         if (noise_flag != 0) {
-            double noise_factor = pow(10., (10*log10(speech_energy/noise_energy) - expcected_SNR) / 20);
+            //double noise_factor = pow(10., (10*log10(speech_energy/noise_energy) - expcected_SNR) / 20);
+            double noise_factor = pow(10., (10*log10(speech_energy/noise_energy) - expcected_SNR) / SNR_range);
+
             //fprintf(stderr, "speech_energy %f ===, noise_energy ======= %f, noise_factor ==== %f\n", speech_energy, noise_energy, noise_factor);
             for (i = 0; i < FRAME_SIZE; i++) {
                 n[i] = noise_factor * noise_input[i];
@@ -968,6 +981,7 @@ void display_usage()
     printf("Usage: denoise_train_data_creator\n" \
            "--speech_path, -s: path for speech wav audio file. default: ./speech/\n" \
            "--noise_path, -n: path for noise wav audio file. default: ./noise/\n" \
+           "--snr_range, -r: Sound Noise Ratio (SNR) range (dB) as <min_value>,<max_value>. default: 0,20\n" \
            "--loop_num, -l: generate loop number. default: 10000\n" \
            "--output_audio_file, -a: output mixed wav audio file. default: mixed.wav\n" \
            "--output_feature_file, -f: output audio feature matrix file. default: train_data_16k_f32.bin\n" \
@@ -982,6 +996,7 @@ int main(int argc, char** argv)
 {
     char speech_path[MAX_STR_LEN] = "./speech/";
     char noise_path[MAX_STR_LEN] = "./noise/";
+    char snr_range_string[MAX_STR_LEN] = "0,20";
     int loop_num = 10000;
     char output_audio_file[MAX_STR_LEN] = "mixed.wav";
     char output_feature_file[MAX_STR_LEN] = "train_data_16k_f32.bin";
@@ -992,6 +1007,7 @@ int main(int argc, char** argv)
         static struct option long_options[] = {
             {"speech_path", required_argument, NULL, 's'},
             {"noise_path", required_argument, NULL, 'n'},
+            {"snr_range", required_argument, NULL, 'r'},
             {"loop_num", required_argument, NULL, 'l'},
             {"output_audio_file", required_argument, NULL, 'a'},
             {"output_feature_file", required_argument, NULL, 'f'},
@@ -1001,7 +1017,7 @@ int main(int argc, char** argv)
 
         /* getopt_long stores the option index here. */
         int option_index = 0;
-        c = getopt_long(argc, argv, "a:f:hl:n:s:v:", long_options, &option_index);
+        c = getopt_long(argc, argv, "a:f:hl:n:r:s:v:", long_options, &option_index);
 
         /* Detect the end of the options. */
         if (c == -1) break;
@@ -1022,6 +1038,10 @@ int main(int argc, char** argv)
                 memset(noise_path, 0, MAX_STR_LEN);
                 strcpy(noise_path, optarg);
                 break;
+            case 'r':
+                memset(snr_range_string, 0, MAX_STR_LEN);
+                strcpy(snr_range_string, optarg);
+                break;
             case 's':
                 memset(speech_path, 0, MAX_STR_LEN);
                 strcpy(speech_path, optarg);
@@ -1038,7 +1058,7 @@ int main(int argc, char** argv)
         }
     }
 
-    denoise_train_data_creator(speech_path, noise_path, loop_num, output_audio_file, output_feature_file, verbose);
+    denoise_train_data_creator(speech_path, noise_path, snr_range_string, loop_num, output_audio_file, output_feature_file, verbose);
 
     return 0;
 }

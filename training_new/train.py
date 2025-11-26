@@ -69,7 +69,7 @@ def train(args):
     print('Freeze the first {} layers of total {} layers.'.format(freeze_layer_number, len(model.layers)))
     model.compile(loss=[denoise_loss, vad_loss],
                   metrics=[msse],
-                  optimizer=optimizer, loss_weights=[10, 0.5])
+                  optimizer=optimizer, loss_weights=args.loss_weights)
 
     # Transfer training some epochs with frozen layers first if needed, to get a stable loss.
     initial_epoch = args.init_epoch
@@ -107,7 +107,7 @@ def train(args):
     print("Unfreeze and continue training, to fine-tune.")
     model.compile(loss=[denoise_loss, vad_loss],
                   metrics=[msse],
-                  optimizer=optimizer, loss_weights=[10, 0.5])
+                  optimizer=optimizer, loss_weights=args.loss_weights)
 
     model.fit(x_train, [y_train, vad_train],
               validation_split=args.val_split,
@@ -145,6 +145,8 @@ def main():
         help="validation data persentage in dataset, default=%(default)s")
 
     # Training options
+    parser.add_argument('--loss_weights', type=str, required=False, default='10,0.5',
+        help="loss weights coefficient as '<denoise_loss>,<vad_loss>', default=%(default)s")
     parser.add_argument('--batch_size', type=int, required=False, default=64,
         help="batch size for train, default=%(default)s")
     parser.add_argument('--optimizer', type=str, required=False, default='adam', choices=['adam', 'rmsprop', 'sgd'],
@@ -164,6 +166,10 @@ def main():
     #    help='Number of GPU to use, default=%(default)s')
 
     args = parser.parse_args()
+
+    denoise_loss_weights, vad_loss_weights = args.loss_weights.split(',')
+    args.loss_weights = [float(denoise_loss_weights), float(vad_loss_weights)]
+
 
     train(args)
 
