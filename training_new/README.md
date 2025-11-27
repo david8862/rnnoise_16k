@@ -38,7 +38,7 @@ An end-to-end RNNoise speech denoise/vad model build pipeline for 16K sample rat
 
     ```
     # cd ../src/
-    # ./compile.sh
+    # ./compile_denoise_train_data_creator.sh
     # ./denoise_train_data_creator -h
     Usage: denoise_train_data_creator
     --speech_path, -s: path for speech wav audio file. default: ./speech/
@@ -164,6 +164,8 @@ options:
                         validation data persentage in dataset, default=0.1
   --loss_weights LOSS_WEIGHTS
                         loss weights coefficient as '<denoise_loss>,<vad_loss>', default=10,0.5
+  --monitor_loss {total,denoise,vad}
+                        which loss (total/denoise/vad) to monitor for saving checkpoint, default=total
   --batch_size BATCH_SIZE
                         batch size for train, default=64
   --optimizer {adam,rmsprop,sgd}
@@ -184,11 +186,11 @@ options:
 
 Following is reference config cmd for training:
 ```
-# python train.py --bands_num=18 --delta_ceps_num=6 --sequence_length=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --decay_type=cosine --transfer_epoch=5 --total_epoch=100
+# python train.py --bands_num=18 --delta_ceps_num=6 --sequence_length=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --loss_weights=0.5,5 --monitor_loss=vad --decay_type=cosine --transfer_epoch=5 --total_epoch=100
 ```
 or training on GPU 0, 1 and 2, if you have several GPUs on your host/server:
 ```
-# CUDA_VISIBLE_DEVICES=0,1,2 python train.py --bands_num=18 --delta_ceps_num=6 --sequence_length=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --decay_type=cosine --transfer_epoch=5 --total_epoch=100
+# CUDA_VISIBLE_DEVICES=0,1,2 python train.py --bands_num=18 --delta_ceps_num=6 --sequence_length=2000 --train_data_file=../training/train_data.h5 --weights_path=../training/models/weights-improvement-95-0.02729.hdf5 --val_split=0.1 --loss_weights=0.5,5 --monitor_loss=vad --decay_type=cosine --transfer_epoch=5 --total_epoch=100
 ```
 
 Checkpoints during training could be found at `logs/000/`. Choose a best one as result

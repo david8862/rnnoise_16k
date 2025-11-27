@@ -34,17 +34,25 @@ def train(args):
     log_dir = 'logs/000'
     os.makedirs(log_dir, exist_ok=True)
 
+    # parse checkpoint monitor type
+    if args.monitor_loss == 'denoise':
+        monitor_type = 'denoise_output_loss'
+    elif args.monitor_loss == 'vad':
+        monitor_type = 'vad_output_loss'
+    else:
+        monitor_type = 'loss'
+
     # callbacks for training process
     logging = TensorBoard(log_dir=log_dir, histogram_freq=0, write_graph=False, write_grads=False, write_images=False, update_freq='batch')
-    checkpoint = ModelCheckpoint(os.path.join(log_dir, 'ep{epoch:03d}-denoise_output_loss{denoise_output_loss:.3f}-vad_output_loss{vad_output_loss:.3f}.h5'),
-        monitor='denoise_output_loss',
+    checkpoint = ModelCheckpoint(os.path.join(log_dir, 'ep{epoch:03d}-loss{loss:.3f}-denoise_loss{denoise_output_loss:.3f}-vad_loss{vad_output_loss:.3f}.h5'),
+        monitor=monitor_type,
         mode='min',
         verbose=1,
         save_weights_only=False,
         save_best_only=True,
         period=1)
     #reduce_lr = ReduceLROnPlateau(monitor='denoise_output_loss', mode='min', factor=0.5, patience=10, verbose=1, cooldown=0, min_lr=1e-10)
-    early_stopping = EarlyStopping(monitor='denoise_output_loss', mode='min', min_delta=0, patience=50, verbose=1)
+    early_stopping = EarlyStopping(monitor=monitor_type, mode='min', min_delta=0, patience=50, verbose=1)
     terminate_on_nan = TerminateOnNaN()
     checkpoint_clean = CheckpointCleanCallBack(log_dir, max_keep=5)
     #learn_rates = [0.05, 0.01, 0.005, 0.001, 0.0005]
@@ -147,6 +155,8 @@ def main():
     # Training options
     parser.add_argument('--loss_weights', type=str, required=False, default='10,0.5',
         help="loss weights coefficient as '<denoise_loss>,<vad_loss>', default=%(default)s")
+    parser.add_argument('--monitor_loss', type=str, required=False, default='total', choices=['total', 'denoise', 'vad'],
+        help="which loss (total/denoise/vad) to monitor for saving checkpoint, default=%(default)s")
     parser.add_argument('--batch_size', type=int, required=False, default=64,
         help="batch size for train, default=%(default)s")
     parser.add_argument('--optimizer', type=str, required=False, default='adam', choices=['adam', 'rmsprop', 'sgd'],

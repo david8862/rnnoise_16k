@@ -583,17 +583,17 @@ float calculate_wav_energy(float *wav_buffer, uint64_t sampleCount){
 
 void get_file_list(DIR *dir, char* path, char **file_list, int *count){
     struct dirent *entry;
-    char single_file[120];
+    char single_file[MAX_FILE_NAME];
     char *pFile;
     while ((entry = readdir(dir))!=NULL){
-        pFile = strchr(entry->d_name, '.');
+        pFile = strrchr(entry->d_name, '.');
         if (pFile!=NULL) {
             //printf("file things ==== %s\n", pFile);
             if (strcmp(pFile, ".wav")==0) {
-                printf("check ===== %s\n", entry->d_name);
-
+                //printf("check ===== %s\n", entry->d_name);
+                memset(single_file, 0, MAX_FILE_NAME);
                 sprintf(single_file, "%s/%s", path, entry->d_name); //构成文件全路径v
-                printf("count %d, wav single file full path name === %s \n", *count, single_file);
+                //printf("count %d, wav single file full path name === %s \n", *count, single_file);
                 strcpy(file_list[*count], single_file);
                 (*count)++;
             }else{
@@ -603,7 +603,7 @@ void get_file_list(DIR *dir, char* path, char **file_list, int *count){
             continue;
         }
     }
-    printf("num of file in directory ====== %d\n",*count);
+    printf("num of file in directory %s: %d\n", path, *count);
 }
 
 float *wavRead_f32(const char *filename, uint32_t *sampleRate, uint64_t *sampleCount, uint32_t *channels) {
@@ -636,6 +636,7 @@ float *wavRead_f32(const char *filename, uint32_t *sampleRate, uint64_t *sampleC
 float  *open_file(char **dir_list, int file_list_len, uint32_t *sampleRate, uint64_t *sampleCount, uint32_t *channels)
 {
     int i = rand()%(file_list_len);
+    //printf("open wav file: %s\n", dir_list[i]);
     float *buffer = wavRead_f32(dir_list[i], sampleRate, sampleCount, channels);
 
     return buffer;
@@ -736,7 +737,7 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, char* snr_ra
     //if((dirSpeech = opendir(argv[1])) == NULL || (dirNoise = opendir(argv[2])) == NULL)
     if((dirSpeech = opendir(speech_path)) == NULL || (dirNoise = opendir(noise_path)) == NULL)
     {
-        //printf("open dir failed !");
+        printf("open speech & noise dir failed!");
         return -1;
     }
     else{
@@ -825,12 +826,15 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, char* snr_ra
             }
         }
 
-        if (speech_frames==0) {
+        if (speech_frames <= 0) {
             DRWAV_FREE(speech_buffer);
             speech_buffer = open_file(speech_array, speechcount,
                                       &speech_sampleRate, &speech_sampleCount, &speech_channels);
-            speech_energy = calculate_wav_energy(speech_buffer, speech_sampleCount);
+            // no valid speech audio data, bypass this speech audio file
+            if (speech_sampleCount <= 0)
+                continue;
 
+            speech_energy = calculate_wav_energy(speech_buffer, speech_sampleCount);
             speech_frames = speech_sampleCount / FRAME_SIZE;
             speech_input = speech_buffer;
         }
@@ -846,10 +850,14 @@ int denoise_train_data_creator(char* speech_path, char* noise_path, char* snr_ra
             E = 0;
         }
 
-        if (noise_frames==0) {
+        if (noise_frames <= 0) {
             DRWAV_FREE(noise_buffer);
             noise_buffer = open_file(noise_array, noisecount,
                                      &noise_sampleRate, &noise_sampleCount, &noise_channels);
+            // no valid noise audio data, bypass this noise audio file
+            if (noise_sampleCount <= 0)
+                continue;
+
             noise_energy = calculate_wav_energy(noise_buffer, noise_sampleCount);
 
             noise_frames = noise_sampleCount / FRAME_SIZE;
